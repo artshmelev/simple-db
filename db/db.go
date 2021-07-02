@@ -28,10 +28,13 @@ func NewDB() (DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &db{
+	db := &db{
 		fd:   fd,
 		hmap: make(map[string]int64),
-	}, nil
+	}
+	db.readHashIndex()
+
+	return db, nil
 }
 
 type keyValue struct {
@@ -105,5 +108,28 @@ func (db *db) Get(k string) (string, error) {
 }
 
 func (db *db) Close() {
+	db.writeHashIndex()
 	db.fd.Close()
+}
+
+func (db *db) readHashIndex() error {
+	fd, err := os.Open(hashIndexFileName)
+	if err != nil {
+		return hmap, err
+	}
+}
+
+func putVarintString(buf *bytes.Buffer, s string) {
+	bufVarint := make([]byte, binary.MaxVarintLen64)
+	n := binary.PutVarint(bufVarint, int64(len(s)))
+	buf.Write(bufVarint[:n])
+	buf.WriteString(s)
+}
+
+func (db *db) writeHashIndex() error {
+	var buf bytes.Buffer
+	for k, v := range db.hmap {
+		putVarintString(&buf, k)
+		putVarintString(&buf, v)
+	}
 }
